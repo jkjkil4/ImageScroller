@@ -14,19 +14,24 @@ void Viewport::mouseMoveEvent(QMouseEvent *ev) {
     if(ev->buttons() & Qt::LeftButton) {
         int xMouseOffset = ev->x() - mPosLMousePress.x();
         int yMouseOffset = ev->y() - mPosLMousePress.y();
-        mXOffset += xMouseOffset / mScale;
-        mYOffset += yMouseOffset / mScale;
+        mXOffset -= xMouseOffset / mScale;
+        mYOffset -= yMouseOffset / mScale;
         limitOffset();
         mPosLMousePress = ev->pos();
+        update();
     }
 }
 void Viewport::wheelEvent(QWheelEvent *ev) {
-    mScale = qBound<double>(0.1, mScale + ev->delta() / 1200.0, 10);
+    double scale = qBound<double>(0.1, mScale + ev->delta() / 1200.0, 10);
+    if(scale != mScale) {
+        mScale = scale;
+        emit scaleChanged(scale);
+    }
     update();
 }
 void Viewport::paintEvent(QPaintEvent *) {
     QPainter p(this);
-    if(!mImage.isNull()) {
+    if(isVaild()) {
         p.setRenderHint(QPainter::Antialiasing);
         p.drawImage(targetRect(), mImage, mImage.rect());
         p.setRenderHint(QPainter::Antialiasing, false);
@@ -42,7 +47,14 @@ bool Viewport::load(const QString &imgPath) {
         if(!ir.read(&mImage))
             return false;
         resetConfig();
-        mTimer->start(60);
+        emit vaildChanged(true);
+        CHECK_CHANGED(mPrevXOffset, mXOffset, xOffsetChanged);
+        CHECK_CHANGED(mPrevYOffset, mYOffset, yOffsetChanged);
+        CHECK_CHANGED(mPrevMaxXOffset, maxXOffset(), maxXOffsetChanged);
+        CHECK_CHANGED(mPrevMaxYOffset, maxYOffset(), maxYOffsetChanged);
+        emit scaleChanged(mScale);
+        emit spdChanged(mSpd);
+        mTimer->start(100);
     }
     return can;
 }
@@ -50,100 +62,38 @@ bool Viewport::load(const QString &imgPath) {
 void Viewport::resetConfig() {
     mXOffset = 0;
     mYOffset = 0;
-    mScale = 1;
+    mScale = (width() - 16.0) / mImage.width();
     mSpd = 0.4;
 }
 double Viewport::maxXOffset() {
-    return qMax<double>(0, (mImage.width() - width() / mScale) / 2);
+    return qMax<double>(0, (mImage.width() - width() / mScale) / 2 + 8);
 }
 double Viewport::maxYOffset() {
-    return mImage.height() - height() / mScale;
+    return mImage.height() - height() / mScale + 8;
 }
 void Viewport::limitOffset() {
     double maxXOff = maxXOffset();
     mXOffset = qBound<double>(-maxXOff, mXOffset, maxXOff);
-    mYOffset = qBound<double>(-maxYOffset(), mYOffset, 0);
+    mYOffset = qBound<double>(0, mYOffset, maxYOffset());
 }
 
 QRectF Viewport::targetRect() {
+    double xOffset = -mXOffset;
+    double yOffset = -mYOffset;
     double w = mImage.width() * mScale;
     double h = mImage.height() * mScale;
-    double x = (width() - w) / 2 + mXOffset * mScale;
-    double y = mYOffset * mScale;
+    double x = (width() - w) / 2 + xOffset * mScale;
+    double y = yOffset * mScale;
     return QRectF(x, y, w, h);
 }
 
 void Viewport::onUpdateOffset() {
-    mYOffset -= mSpd;
+    mYOffset += mSpd;
     limitOffset();
+    CHECK_CHANGED(mPrevXOffset, mXOffset, xOffsetChanged);
+    CHECK_CHANGED(mPrevYOffset, mYOffset, yOffsetChanged);
+    CHECK_CHANGED(mPrevMaxXOffset, maxXOffset(), maxXOffsetChanged);
+    CHECK_CHANGED(mPrevMaxYOffset, maxYOffset(), maxYOffsetChanged);
     update();
 }
 
-
-
-
-
-
-//Viewport::Viewport(QWidget *parent) : QWidget(parent)
-//{
-//    connect(mTimer, &QTimer::timeout, this, &Viewport::onUpdateOffset);
-//    setFocusPolicy(Qt::FocusPolicy::StrongFocus);
-//}
-
-//void Viewport::keyPressEvent(QKeyEvent *ev) {
-//    bool hasCtrl = ev->modifiers() & Qt::ControlModifier;
-//    switch((int)ev->key()) {
-//    case Qt::Key_Up:
-//        if(hasCtrl) yOffset += 50; else spd -= 0.05;
-//        limitYOffset();
-//        break;
-//    case Qt::Key_Down:
-//        if(hasCtrl) yOffset -= 50; else spd += 0.05;
-//        limitYOffset();
-//        break;
-//    }
-//}
-//void Viewport::wheelEvent(QWheelEvent *ev) {
-//    scale += ev->delta() / 1200.0;
-//}
-//void Viewport::paintEvent(QPaintEvent *) {
-//    if(!mImage.isNull()) {
-//        QPainter p(this);
-//        p.setRenderHint(QPainter::Antialiasing);
-
-//        p.drawImage(drawRect(), mImage, mImage.rect());
-//    }
-//}
-
-//bool Viewport::load(const QString &imgPath) {
-//    QImageReader ir(imgPath);
-//    bool can = ir.canRead();
-//    if(can) {
-//        QImageReader ir(imgPath);
-//        if(!ir.read(&mImage))
-//            return false;
-//        yOffset = 0;
-//        scale = (width() - 8.0) / mImage.width();
-//        spd = -0.5;
-//        mTimer->start(60);
-//    }
-//    return can;
-//}
-
-//QRect Viewport::drawRect() {
-//    int w = (int)(mImage.width() * scale);
-//    int h = (int)(mImage.height() * scale);
-//    return QRect((width() - w) / 2, (int)yOffset, w, h);
-//}
-//int Viewport::minYOffset() {
-//    return -(int)(mImage.height() * scale) + height() / 2;
-//}
-//void Viewport::limitYOffset() {
-//    yOffset = qBound<double>(minYOffset(), yOffset, 0);
-//}
-
-//void Viewport::onUpdateOffset() {
-//    yOffset += spd;
-//    limitYOffset();
-//    update();
-//}

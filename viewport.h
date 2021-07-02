@@ -9,6 +9,8 @@
 
 #include "header.h"
 
+#define CHECK_CHANGED(prevVal, val, emitFn) if(val != prevVal) { prevVal = val; emit emitFn(val);  }
+
 class Viewport : public QWidget
 {
     Q_OBJECT
@@ -30,14 +32,22 @@ public:
 
     QRectF targetRect();
 
-    VAR_FUNC(scale, setScale, mScale, double, , )
-    VAR_FUNC(spd, setSpd, mSpd, double, , )
+    bool isVaild() { return !mImage.isNull(); }
+    void setXOffset(double val) { mXOffset = val; update(); }
+    void setYOffset(double val) { mYOffset = val; update(); }
+    double scale() { return mScale; }
+    void setScale(double val) { CHECK_CHANGED(mScale, val, scaleChanged); update(); }
+    double spd() { return mSpd; }
+    void setSpd(double val) { CHECK_CHANGED(mSpd, val, spdChanged); update(); }
 
-//    bool load(const QString &imgPath);
-
-//    QRect drawRect();
-//    int minYOffset();
-//    void limitYOffset();
+signals:
+    void vaildChanged(bool vaild);
+    void xOffsetChanged(double val);
+    void yOffsetChanged(double val);
+    void maxXOffsetChanged(double val);
+    void maxYOffsetChanged(double val);
+    void scaleChanged(double val);
+    void spdChanged(double val);
 
 private slots:
     void onUpdateOffset();
@@ -53,13 +63,9 @@ private:
     double mScale = 1;   //缩放
     double mSpd = 0.4;   //移动速度
 
-
-//    QImage mImage;
-
-//    double yOffset = 0;
-//    double spd = -0.5;
-//    double scale = 1;
-
-//    QTimer *mTimer = new QTimer(this);
+    double mPrevXOffset = -1;
+    double mPrevYOffset = -1;
+    double mPrevMaxXOffset = -1;
+    double mPrevMaxYOffset = -1;
 };
 
